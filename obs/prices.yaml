@@ -14,6 +14,8 @@ models:
   - {id: claude-sonnet-5-5, provider: anthropic, input: 2,   cached_input: 0.10, cache_write_input: 2.5, output: 10,  note: null}
   - {id: claude-haiku-5-5, provider: anthropic, input: 0.10, cached_input: 0.01, cache_write_input: 0.125, output: 0.50, note: ">100K prompts: 0.50/0.05/2.50"}
   - {id: claude-fable-5-1, provider: anthropic, input: 10,   cached_input: 0.25, cache_write_input: 12.5, output: 50,  note: "cache hit 0.025x"}
+  - {id: claude-fable-5-2, provider: anthropic, input: 8,    cached_input: 0.20, cache_write_input: 10, output: 40,  note: "Anthropic page 2026-11-11; cache hit 0.025x"}
+  - {id: claude-haiku-4-5, provider: anthropic, input: 1,    cached_input: 0.10, cache_write_input: 1.25, output: 5,  note: "Anthropic page 2026-11-11"}
   - {id: claude-opus-4-8,  provider: anthropic, input: 5, cached_input: 0.50, cache_write_input: 6.25, output: 25, note: "Anthropic page 2026-11-08: 5m write 6.25, 1h write 10"}
   - {id: "<synthetic>",    provider: anthropic, input: 0, cached_input: 0, cache_write_input: 0, output: 0, note: "Claude Code placeholder messages, no model call: free"}
   - {id: gpt-6-astra,      provider: openai,    input: 10,   cached_input: 1.00, cache_write_input: null, output: 50,  note: "standard, short context"}
