@@ -1,0 +1,7 @@
+.git
+.venv
+data
+reports
+transcripts
+observatory
+**/__pycache__

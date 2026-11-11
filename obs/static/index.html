@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>Agent Observatory</title>
+<link rel="icon" href="/static/logo-mono.png">
+<link rel="stylesheet" href="/static/uPlot.min.css">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <img class="logo logo-light" src="/static/logo-mono.png" width="44" height="44" alt="Agent Observatory">
+    <img class="logo logo-dark" src="/static/logo-white.png" width="44" height="44" alt="Agent Observatory">
+    <span class="rec" id="rec" title="recorder status"></span>
+    <div>
+      <h1>Agent Observatory</h1>
+      <p class="sub">Black-box recorder for your coding agents. Private, on this NAS, read-only.</p>
+    </div>
+  </div>
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Date range">
+      <button data-days="7">7 days</button><button data-days="14">14 days</button><button data-days="30">30 days</button>
+    </div>
+    <div class="chips" id="chips" role="group" aria-label="Harness filter"></div>
+    <p class="status" id="status">Reading the recorder&hellip;</p>
+  </div>
+</header>
+
+<section class="kpis" id="kpis" aria-label="Totals for the selected range"></section>
+
+<main class="grid">
+  <article class="panel wide" id="p-context">
+    <header><span class="ch">01</span><h2>Context processed per day</h2><span class="unit">tokens, UTC days</span></header>
+    <div class="figure" id="f-context"></div>
+    <div class="chart" id="c-context"></div>
+    <div class="readout" id="r-context"></div>
+    <p class="hint" id="h-context"></p>
+  </article>
+
+  <article class="panel narrow" id="p-cache">
+    <header><span class="ch">02</span><h2>Context per request</h2><span class="unit">tokens, median and p95 per day</span></header>
+    <div class="figure" id="f-cache"></div>
+    <div class="chart" id="c-cache"></div>
+    <p class="hint" id="h-cache"></p>
+  </article>
+
+  <article class="panel half" id="p-tools">
+    <header><span class="ch">03</span><h2>Top tools by result bytes</h2><span class="unit">bytes returned into context</span></header>
+    <div class="figure" id="f-tools"></div>
+    <div class="table" id="t-tools"></div>
+    <p class="hint" id="h-tools"></p>
+  </article>
+
+  <article class="panel half" id="p-largest">
+    <header><span class="ch">04</span><h2>Largest single tool outputs</h2><span class="unit">one call each</span></header>
+    <div class="figure" id="f-largest"></div>
+    <div class="table" id="t-largest"></div>
+    <p class="hint" id="h-largest"></p>
+  </article>
+
+  <article class="panel half" id="p-repeats">
+    <header><span class="ch">05</span><h2>Repeated payloads</h2><span class="unit">same content 3+ times</span></header>
+    <div class="figure" id="f-repeats"></div>
+    <div class="table" id="t-repeats"></div>
+    <p class="hint" id="h-repeats"></p>
+  </article>
+
+  <article class="panel half" id="p-sessions">
+    <header><span class="ch">06</span><h2>Heaviest sessions</h2><span class="unit">by context processed</span></header>
+    <div class="figure" id="f-sessions"></div>
+    <div class="table" id="t-sessions"></div>
+    <p class="hint" id="h-sessions"></p>
+  </article>
+
+  <article class="panel half" id="p-models">
+    <header><span class="ch">07</span><h2>Model mix</h2><span class="unit">by requests</span></header>
+    <div class="figure" id="f-models"></div>
+    <div class="bars" id="t-models"></div>
+    <p class="hint" id="h-models"></p>
+  </article>
+
+  <article class="panel half" id="p-loops">
+    <header><span class="ch">08</span><h2>Retry loops</h2><span class="unit">5+ identical calls in 10 min</span></header>
+    <div class="figure" id="f-loops"></div>
+    <div class="table" id="t-loops"></div>
+    <p class="hint" id="h-loops"></p>
+  </article>
+
+  <article class="panel half" id="p-subagents">
+    <header><span class="ch">09</span><h2>Subagents</h2><span class="unit">spawns by type, model requested</span></header>
+    <div class="figure" id="f-subagents"></div>
+    <div class="bars" id="t-subagents"></div>
+    <div class="table" id="l-subagents"></div>
+    <p class="hint" id="h-subagents"></p>
+  </article>
+
+  <article class="panel half" id="p-skills">
+    <header><span class="ch">10</span><h2>Skills invoked</h2><span class="unit">by name and agent kind</span></header>
+    <div class="figure" id="f-skills"></div>
+    <div class="bars" id="t-skills"></div>
+    <div class="readout" id="k-skills"></div>
+    <p class="hint" id="h-skills"></p>
+  </article>
+
+  <article class="panel full" id="p-bash">
+    <header><span class="ch">11</span><h2>Shell</h2><span class="unit">tokens returned by family and target; click a row to drill down</span></header>
+    <div class="figure" id="f-bash"></div>
+    <div class="table" id="d-bash"></div>
+    <div class="chart" id="c-bash"></div>
+    <div class="table" id="t-bash"></div>
+    <p class="hint" id="h-bash"></p>
+  </article>
+  <article class="panel full" id="p-readtypes">
+    <header><span class="ch">12</span><h2>Read by file type</h2><span class="unit">bytes per file kind per day; top files by re-read tokens</span></header>
+    <div class="figure" id="f-readtypes"></div>
+    <div class="readout" id="r-readtypes"></div>
+    <div class="chart" id="c-readtypes"></div>
+    <div class="table" id="t-readtypes"></div>
+    <p class="hint" id="h-readtypes"></p>
+  </article>
+  <article class="panel full" id="p-compactions">
+    <header><span class="ch">13</span><h2>Compactions</h2><span class="unit">per day by harness, manual vs auto, segment sizes</span></header>
+    <div class="figure" id="f-compactions"></div>
+    <div class="bars" id="t-compactions-split"></div>
+    <div class="bars" id="t-compactions-sizes"></div>
+    <div class="table" id="t-compactions"></div>
+    <p class="hint" id="h-compactions"></p>
+  </article>
+  <article class="panel full" id="p-beforeafter">
+    <header><span class="ch">14</span><h2>Before / after</h2><span class="unit">tool-result MB and context per day, trailing 30 days</span></header>
+    <div class="figure" id="f-beforeafter"></div>
+    <div class="chart" id="c-beforeafter"></div>
+    <div class="readout" id="r-beforeafter"></div>
+    <p class="hint" id="h-beforeafter"></p>
+  </article>
+</main>
+
+<footer class="foot">
+  <p>Sizes are bytes of tool results as recorded; file:line points into the transcript under its source root; token counts are provider-reported usage. Payload text is never stored, only sizes and SHA-256.
+  Charts: uPlot (MIT). Nothing on this page talks to the internet.</p>
+  <p id="prices">list prices as of 2026-11-08; OpenRouter prices as of (not fetched)</p>
+</footer>
+<script src="/static/uPlot.iife.min.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-observatory"
+version = "0.2.0"
+description = "Private black-box recorder for AI coding agents: transcripts -> Parquet -> daily reports + LAN dashboard"
+requires-python = ">=3.9"
+dependencies = ["duckdb", "pyarrow", "fastapi", "uvicorn"]
+
+[project.optional-dependencies]
+test = ["pytest", "httpx2"]
+
+[project.scripts]
+obs = "obs.__main__:main"
+
+[tool.setuptools]
+packages = ["obs"]
+
+[tool.setuptools.package-data]
+obs = ["static/*", "prices.yaml", "prices-openrouter.yaml"]

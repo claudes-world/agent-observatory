@@ -1,0 +1,35 @@
+# List prices, USD per 1M tokens (copied from docs/hackathon/prices-draft.yaml), from official pages fetched 2026-11-08 (web-fetch agent).
+# cache_write_input = 5-minute cache-write rate (Anthropic page); null = charge cache writes at the plain input rate.
+# Nulls = page unreadable that day: OpenAI (403), DeepSeek (no table on the fetched page), Kimi (empty table). Re-fetch before shipping.
+prices_as_of: "2026-11-08"
+sources:
+  anthropic: https://platform.claude.com/docs/en/about-claude/pricing
+  openai: https://developers.openai.com/api/docs/pricing
+  deepseek: https://api-docs.deepseek.com/quick_start/pricing
+  zhipu: https://docs.z.ai/guides/overview/pricing
+  moonshot: https://platform.kimi.ai/docs/pricing/chat
+  alibaba: https://www.alibabacloud.com/help/en/model-studio/model-pricing
+models:
+  - {id: claude-opus-5-5,  provider: anthropic, input: 4,    cached_input: 0.20, cache_write_input: 5, output: 20,  note: "cache hit 0.05x; fast mode 8/40"}
+  - {id: claude-sonnet-5-5, provider: anthropic, input: 2,   cached_input: 0.10, cache_write_input: 2.5, output: 10,  note: null}
+  - {id: claude-haiku-5-5, provider: anthropic, input: 0.10, cached_input: 0.01, cache_write_input: 0.125, output: 0.50, note: ">100K prompts: 0.50/0.05/2.50"}
+  - {id: claude-fable-5-1, provider: anthropic, input: 10,   cached_input: 0.25, cache_write_input: 12.5, output: 50,  note: "cache hit 0.025x"}
+  - {id: claude-opus-4-8,  provider: anthropic, input: 5, cached_input: 0.50, cache_write_input: 6.25, output: 25, note: "Anthropic page 2026-11-08: 5m write 6.25, 1h write 10"}
+  - {id: "<synthetic>",    provider: anthropic, input: 0, cached_input: 0, cache_write_input: 0, output: 0, note: "Claude Code placeholder messages, no model call: free"}
+  - {id: gpt-6-astra,      provider: openai,    input: 10,   cached_input: 1.00, cache_write_input: null, output: 50,  note: "standard, short context"}
+  - {id: gpt-6.1-sol,      provider: openai,    input: 2,    cached_input: 0.10, cache_write_input: null, output: 10,  note: null}
+  - {id: gpt-6.1-terra,    provider: openai,    input: 1,    cached_input: 0.05, cache_write_input: null, output: 5,   note: null}
+  - {id: gpt-6-luna,       provider: openai,    input: 0.10, cached_input: 0.01, cache_write_input: null, output: 0.50, note: null}
+  - {id: gpt-6-sol,        provider: openai,    input: 2,    cached_input: 0.20, cache_write_input: null, output: 10,  note: null}
+  - {id: gpt-5.6-sol,      provider: openai,    input: 4,    cached_input: 0.40, cache_write_input: null, output: 20,  note: "promo pricing until 2026-11-30"}
+  - {id: gpt-5.6-terra,    provider: openai,    input: 2,    cached_input: 0.20, cache_write_input: null, output: 12,  note: null}
+  - {id: gpt-5.6-luna,     provider: openai,    input: 0.20, cached_input: 0.02, cache_write_input: null, output: 1.20, note: null}
+  - {id: gpt-6.1-luna,     provider: openai,    input: null, cached_input: null, cache_write_input: null, output: null, note: "not listed on the pricing page 2026-11-08"}
+  - {id: deepseek-chat,    provider: deepseek,  input: null, cached_input: null, cache_write_input: null, output: null, note: "DeepSeek docs show no price table on 2026-11-08 (platform pricing page 403); fill from the console when keys arrive"}
+  - {id: GLM-5.3,          provider: zhipu,     input: 1.4,  cached_input: 0.26, cache_write_input: null, output: 4.4, note: null}
+  - {id: GLM-5.3-Flash,    provider: zhipu,     input: 0.15, cached_input: 0.03, cache_write_input: null, output: 0.50, note: null}
+  - {id: GLM-5,            provider: zhipu,     input: 1,    cached_input: 0.2, cache_write_input: null, output: 3.2, note: null}
+  - {id: kimi-k3,          provider: moonshot,  input: null, cached_input: null, cache_write_input: null, output: null, note: "Kimi price tables render client-side; fill from the console when keys arrive"}
+  - {id: qwen3.8-max,      provider: alibaba,   input: 2,    cached_input: null, cache_write_input: null, output: 6,   note: "intl region"}
+  - {id: qwen3.7-plus,     provider: alibaba,   input: 0.4,  cached_input: null, cache_write_input: null, output: 1.6, note: "256K-1M: 1.2/4.8"}
+  - {id: qwen3-coder-flash, provider: alibaba,  input: 0.3,  cached_input: null, cache_write_input: null, output: 1.5, note: "tiered by context: 32K 0.3/1.5 … 1M 1.6/9.6"}

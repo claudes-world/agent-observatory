@@ -1,0 +1,26 @@
+# Agent Observatory on the NAS. Put (or sync) Claude Code project folders into ./transcripts
+# (same layout as ~/.claude/projects: <project>/<session>.jsonl plus <project>/<session>/subagents/).
+# Parquet events land in ./observatory/events, daily reports in ./observatory/reports.
+services:
+  observatory:
+    build: .
+    image: agent-observatory:latest
+    container_name: agent-observatory
+    restart: unless-stopped
+    # open-file limit (systemd: LimitNOFILE=65536). The dashboard keeps one in-memory DuckDB and opens parquet
+    # files only when the file set changes, but ingest and reports scan every day file; 1024 is too tight.
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    # user: "1000:1000"   # set to the NAS owner of ./observatory if it is not uid 1000
+    environment:
+      OBS_INTERVAL: "10"   # minutes between ingest cycles
+      OBS_BACKFILL: "30"   # days read on the first cycle
+      OBS_RECENT: "3"      # days re-read on later cycles
+      OBS_HOST: "nas"      # stable name for the per-day Parquet file
+    volumes:
+      - ./transcripts:/transcripts:ro
+      - ./observatory:/data
+    ports:
+      - "8787:8787"

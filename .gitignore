@@ -1,0 +1,13 @@
+.venv/
+data/
+
+__pycache__/
+build/
+*.egg-info/
+transcripts/
+observatory/
+# per-call ledgers from real transcripts: large and regenerable (obs report); fixtures/reports keeps its ledgers
+reports/*/*.csv
+# excerpts from real transcripts hold transcript text (scanned): regenerable with obs report, never committed
+reports/*/excerpts/
+scratch/
