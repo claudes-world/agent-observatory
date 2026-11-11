@@ -11,25 +11,24 @@
 </head>
 <body>
 <header class="top">
-  <div class="brand">
-    <img class="logo logo-light" src="/static/logo-mono.png" width="72" height="72" alt="Agent Observatory">
-    <img class="logo logo-dark" src="/static/logo-white.png" width="72" height="72" alt="Agent Observatory">
-    <span class="rec" id="rec" title="recorder status"></span>
-    <div>
-      <h1>Agent Observatory</h1>
-      <p class="sub">Private black-box recorder for your coding agents.</p>
+  <img class="logo logo-light" src="/static/logo-mono.png" width="144" height="144" alt="Agent Observatory">
+  <img class="logo logo-dark" src="/static/logo-white.png" width="144" height="144" alt="Agent Observatory">
+  <div class="head">
+    <div class="headrow">
+      <div class="brand">
+        <h1>Agent Observatory</h1>
+        <p class="sub">Private black-box recorder for your coding agents.</p>
+      </div>
+      <div class="when">
+        <div class="seg" role="group" aria-label="Date range">
+          <button data-days="7">7 days</button><button data-days="14">14 days</button><button data-days="30">30 days</button>
+        </div>
+        <p class="whenline"><span class="status" id="status">Reading the recorder&hellip;</span><span class="range" id="range"></span></p>
+      </div>
     </div>
-  </div>
-  <div class="when">
-    <div class="seg" role="group" aria-label="Date range">
-      <button data-days="7">7 days</button><button data-days="14">14 days</button><button data-days="30">30 days</button>
-    </div>
-    <p class="range" id="range"></p>
-  </div>
-  <div class="filters">
     <div class="chips" id="chips" role="group" aria-label="Harness filter"></div>
-    <p class="status" id="status">Reading the recorder&hellip;</p>
   </div>
+  <span class="rec" id="rec" hidden></span>
 </header>
 
 <section class="kpis" id="kpis" aria-label="Totals for the selected range"></section>

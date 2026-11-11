@@ -441,7 +441,6 @@
     const a = m.range_start || m.first_day, b = m.range_end || m.last_day;
     $("range").textContent = a && b ? (a === b ? a : `${a} → ${b}`) : "";
     let s = m.last_event ? `last event ${ago(m.last_event)}` : "nothing recorded yet";
-    if (since) s += ` · transcripts on this NAS start ${since}`;
     if (STATIC) { /* status already set */ } else if (w) {
       rec.className = "rec " + (w.ok && Date.now() - Date.parse(w.last_run) < 3 * (w.interval_min || 10) * 60000 ? "live" : "stale");
     } else rec.className = "rec";
