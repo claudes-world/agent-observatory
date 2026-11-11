@@ -498,3 +498,14 @@
   load();
   if (!STATIC) setInterval(load, 5 * 60 * 1000);
 })();
+
+// The logo sizes itself to the header block beside it (wide layout) or stays small (narrow layout).
+(function () {
+  const box = document.querySelector(".logobox"), head = document.querySelector(".head");
+  if (!box || !head || typeof ResizeObserver === "undefined") return;
+  const fit = () => {
+    const s = window.innerWidth <= 720 ? 64 : Math.max(64, Math.min(128, head.offsetHeight));
+    box.style.width = box.style.height = s + "px";
+  };
+  new ResizeObserver(fit).observe(head); window.addEventListener("resize", fit); fit();
+})();
