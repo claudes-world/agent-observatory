@@ -3,7 +3,7 @@
 A View is either a trailing range of UTC days ending at the newest recorded day (dashboard) or one
 UTC day (report.html, charts bucketed by hour). Every panel returns {"rows": [...], "hint": "...", ...}.
 """
-import glob, json, os, re, threading
+import glob, json, os, re, statistics, threading
 from datetime import date, datetime, timedelta, timezone
 import duckdb
 from .ingest import IMAGE_TOKENS
@@ -213,6 +213,8 @@ def p_meta(v):
         count(distinct session_id) filter (agent='subagent') subagent_sessions,
         count(*) filter (event_type='llm_request') requests,
         coalesce(sum(input_tokens + cache_read_tokens),0) context_tokens,
+        coalesce(sum(input_tokens) filter (cache_read_tokens is not null),0) input_tokens,
+        coalesce(sum(cache_read_tokens) filter (input_tokens is not null),0) cache_read_tokens,
         coalesce(sum(output_tokens),0) output_tokens,
         coalesce(sum(content_bytes) filter (event_type='tool_result'),0) tool_bytes,
         coalesce(sum(image_bytes) filter (event_type='tool_result'),0) image_bytes,
@@ -230,6 +232,14 @@ def p_meta(v):
             except ValueError:
                 pass
     m["days"], m["day"] = v.days, v.day
+    # share of context served from cache: cache_read / (input + cache_read), selected range
+    m["cache_hit_rate"] = (m["cache_read_tokens"] / m["context_tokens"]) if m["context_tokens"] else None
+    if v.day:
+        m["range_start"] = m["range_end"] = v.day
+    else:
+        end = v.q("select max(cast(ts as date))::varchar e from raw")[0]["e"]
+        m["range_end"] = end
+        m["range_start"] = (date.fromisoformat(end) - timedelta(days=v.days - 1)).isoformat() if end else None
     m["harnesses"], m["harness_filter"] = v.harnesses(), v.harness
     g = v.q("""select strftime(min(ts), '%Y-%m-%dT%H:%M:%SZ') e, strftime(max(ts), '%Y-%m-%dT%H:%M:%SZ') l,
         (select count(distinct cast(ts as date)) from ev) wd from raw""")[0]
@@ -257,16 +267,17 @@ def p_context(v):
     med = sorted(r["context"] for r in rows)[len(rows) // 2] or 1
     ctx, outp = sum(r["context"] for r in rows), sum(r["output"] for r in rows) or 1
     unit = "hour" if v.bucket == "hour" else "day"
+    days_med = statistics.median(r["context"] for r in rows)
     hint = (f"Peak {peak['day']}: {human_tokens(peak['context'])} context tokens, {peak['context'] / med:.1f}x the median {unit}. "
-            f"Context outweighs output {ctx / outp:,.0f}:1, so trimming what gets re-read every turn "
-            f"(large tool results, long sessions) moves the total; shorter answers do not.")
+            f"Large tool outputs are what grows context: have tools return a summary line instead of a full dump.")
     if not v.day:
         g = v.q("select strftime(min(ts), '%Y-%m-%d') e, strftime(max(ts), '%Y-%m-%d') l from raw")[0]
         pad = no_data_rows(rows[0]["day"], g["l"], v.days, g["e"], ["input", "cache_read", "cache_write", "output", "requests", "context"])
         rows = pad + rows
         if pad:
             hint += f" {pad[0]['day']} to {pad[-1]['day']} predate the first recorded event ({g['e']}): no data, not zero."
-    return {"rows": rows, "hint": hint, "total_context": ctx, "total_output": outp, "bucket": v.bucket}
+    return {"rows": rows, "hint": hint, "total_context": ctx, "total_output": outp, "median_context": days_med,
+            "bucket": v.bucket}
 
 
 def p_cache(v):
@@ -279,17 +290,12 @@ def p_cache(v):
     o = v.q("""select quantile_cont(input_tokens + cache_read_tokens, 0.5)::bigint p50,
         quantile_cont(input_tokens + cache_read_tokens, 0.95)::bigint p95, count(*)::bigint requests
         from ev where event_type='llm_request' and input_tokens + cache_read_tokens > 0""")[0]
-    big = v.q("""select count(*)::bigint n from (select session_id from ev
-        where event_type='llm_request' and input_tokens + cache_read_tokens > 0
-        group by 1 having quantile_cont(input_tokens + cache_read_tokens, 0.95) > 250000)""")[0]["n"]
     if not o["requests"]:
-        return {"rows": rows, "hint": f"No model requests recorded {v.span}.", "p50": None, "p95": None,
-                "big_sessions": 0, "bucket": v.bucket}
-    hint = (f"The median request carries {human_tokens(o['p50'])} tokens and the p95 request carries "
-            f"{human_tokens(o['p95'])}; {big} session{'s' if big != 1 else ''} had a p95 above 250K per request "
-            f"and {'are the compaction candidates' if big != 1 else 'is the compaction candidate'}: "
-            f"compact or split them before the context grows further.")
-    return {"rows": rows, "hint": hint, "p50": o["p50"], "p95": o["p95"], "big_sessions": big,
+        return {"rows": rows, "hint": f"No model requests recorded {v.span}.", "p50": None, "p95": None, "bucket": v.bucket}
+    hint = (f"A typical request carries {human_tokens(o['p50'])} tokens of context and the heaviest 5% carry "
+            f"{human_tokens(o['p95'])} or more. Every request re-sends the whole context, so keep large outputs out of "
+            f"the main session: delegate them to subagents and compact earlier.")
+    return {"rows": rows, "hint": hint, "p50": o["p50"], "p95": o["p95"],
             "requests": o["requests"], "bucket": v.bucket}
 
 

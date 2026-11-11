@@ -38,3 +38,24 @@ def test_day_before_earliest_is_no_data(tmp_path):
         assert pre and all(r["no_data"] and r["context"] is None for r in pre), panel
         assert not any(r.get("no_data") for r in rows if r["day"] >= first)
         assert len({r["day"] for r in rows}) == len(rows)
+
+
+def test_meta_cache_hit_rate_and_range(tmp_path):
+    data, first = _ingest(tmp_path)
+    m = PANELS["meta"](View(Store(data), days=30))["rows"][0]
+    assert m["context_tokens"] == m["input_tokens"] + m["cache_read_tokens"]
+    assert m["cache_hit_rate"] == m["cache_read_tokens"] / m["context_tokens"]
+    assert 0 <= m["cache_hit_rate"] <= 1
+    end = datetime.fromisoformat(m["range_end"])
+    assert m["range_end"] == m["last_day"] and (end - datetime.fromisoformat(m["range_start"])).days == 29
+
+
+def test_context_median_and_hints(tmp_path):
+    data, _ = _ingest(tmp_path)
+    st = Store(data)
+    c = PANELS["context"](View(st, days=30))
+    vals = sorted(r["context"] for r in c["rows"] if not r.get("no_data"))
+    assert vals[0] <= c["median_context"] <= vals[-1]
+    assert "outweighs" not in c["hint"] and "tool output" in c["hint"]
+    k = PANELS["cache"](View(st, days=30))
+    assert k["p50"] <= k["p95"] and "split" not in k["hint"] and "subagents" in k["hint"]

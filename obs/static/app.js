@@ -90,20 +90,36 @@
       tag.style.left = Math.max(0, (L - u.bbox.left) / dpr + 6) + "px"; };
   }
 
+  // dashed horizontal reference line at value y, labelled at the right edge of the plot
+  function medianHook(y, label) {
+    return (u) => { if (y == null) return;
+      const c = u.ctx, dpr = devicePixelRatio, py = Math.round(u.valToPos(y, "y", true));
+      if (py < u.bbox.top || py > u.bbox.top + u.bbox.height) return;
+      c.save(); c.strokeStyle = css("--ink") || "#888"; c.globalAlpha = 0.75; c.lineWidth = 1.5 * dpr;
+      c.setLineDash([6 * dpr, 4 * dpr]); c.beginPath(); c.moveTo(u.bbox.left, py); c.lineTo(u.bbox.left + u.bbox.width, py); c.stroke();
+      c.setLineDash([]); c.globalAlpha = 1; c.font = `600 ${11 * dpr}px ${css("--mono")}`; c.textAlign = "right"; c.textBaseline = "bottom";
+      const tx = u.bbox.left + u.bbox.width - 4 * dpr, ty = py - 4 * dpr, tw = c.measureText(label).width;
+      c.fillStyle = css("--panel") || "#000"; c.fillRect(tx - tw - 3 * dpr, ty - 13 * dpr, tw + 6 * dpr, 14 * dpr);
+      c.fillStyle = css("--ink") || "#888"; c.fillText(label, tx, ty); c.restore(); };
+  }
+
   function drawContext(d) {
     const rows = d.rows, xs = xsOf(rows), half = stepOf(d) / 2;
     const ctx = rows.map((r) => r.context), tot = rows.map((r) => (r.no_data ? null : r.context + r.output));
     const bar = uPlot.paths.bars({ size: [0.72, 48], align: 0 });
     const ro = $("r-context");
     const key = `<span class="key"><span><i class="sw" style="background:${css("--accent")}"></i>context (input + cache read)</span>` +
-      `<span><i class="sw" style="background:${css("--cool")}"></i>output</span></span>`;
+      `<span><i class="sw" style="background:${css("--cool")}"></i>output</span>` +
+      (d.median_context != null ? `<span><i class="sw dash"></i>median day</span>` : "") + `</span>`;
     ro.innerHTML = key;
     plot("context", $("c-context"), {
+      height: 300,
       scales: { x: { time: true, range: (u, a, b) => [a - half, b + half] }, y: { range: (u, a, b) => [0, b * 1.05] } },
       axes: axes(tok, d.bucket),
       series: [{}, { label: "output", fill: css("--cool"), stroke: css("--cool"), paths: bar, width: 0, points: { show: false } },
                    { label: "context", fill: css("--accent"), stroke: css("--accent"), paths: bar, width: 0, points: { show: false } }],
-      hooks: { draw: [noDataHook(rows, half)], setCursor: [(u) => { const i = u.cursor.idx; if (i == null) { ro.innerHTML = key; return; }
+      hooks: { draw: [noDataHook(rows, half), medianHook(d.median_context, "median " + tok(d.median_context))],
+        setCursor: [(u) => { const i = u.cursor.idx; if (i == null) { ro.innerHTML = key; return; }
         const r = rows[i]; if (r.no_data) { ro.textContent = `${r.day}  no data (before the first recorded event)`; return; }
         ro.textContent = `${r.day}  context ${int(r.context)}  output ${int(r.output)}  requests ${int(r.requests)}`; }] },
     }, [xs, tot, ctx]);
@@ -114,6 +130,9 @@
   function drawCache(d) {
     const rows = d.rows;
     const xs = xsOf(rows), p50 = rows.map((r) => r.p50), p95 = rows.map((r) => r.p95), q = stepOf(d) / 4;
+    const per = d.bucket === "hour" ? "hour" : "day", span = d.bucket === "hour" ? "day" : `${days}-day`;
+    $("r-cache").innerHTML = `<span class="key"><span><i class="sw" style="background:${css("--cool")}"></i>median per ${per}</span>` +
+      `<span><i class="sw" style="background:${css("--accent")}"></i>p95 per ${per}</span></span>`;
     plot("cache", $("c-cache"), {
       scales: { x: { time: true, range: (u, a, b) => [a - q, b + q] }, y: { range: (u, lo, hi) => [0, (hi || 1) * 1.08] } },
       axes: axes((v) => tok(v), d.bucket),
@@ -121,7 +140,9 @@
         { label: "p95", stroke: css("--accent"), width: 2, fill: css("--accent-soft"), points: { show: true, size: 6, fill: css("--accent") } },
         { label: "median", stroke: css("--cool"), width: 2, dash: [5, 4], points: { show: true, size: 5, fill: css("--cool") } }],
     }, [xs, p95, p50]);
-    $("f-cache").innerHTML = d.p95 == null ? "" : `<b>${tok(d.p95)}</b> <span>p95 context per request; median ${tok(d.p50)}</span>`;
+    $("f-cache").innerHTML = d.p95 == null ? "" :
+      `<div class="stat" style="color:${css("--cool")}"><span>${span} median</span><b>${tok(d.p50)}</b></div>` +
+      `<div class="stat" style="color:${css("--accent")}"><span>${span} p95</span><b>${tok(d.p95)}</b></div>`;
   }
 
   const secs = (ms) => { ms = +ms || 0; return ms >= 120000 ? (ms / 60000).toFixed(1) + " min" : (ms / 1000).toFixed(ms < 10000 ? 1 : 0) + " s"; };
@@ -417,24 +438,26 @@
     const w = m.watch_status;
     const rec = $("rec");
     const cv = m.coverage, since = cv && cv.earliest_event ? cv.earliest_event.slice(0, 10) : null;
-    let s = `${m.first_day} to ${m.last_day} UTC · last event ${ago(m.last_event)}`;
-    if (since) s += ` · transcripts on this host start ${since}` + (m.days ? ` · ${m.days}-day view shows ${m.days_with_data} days with data` : "");
+    const a = m.range_start || m.first_day, b = m.range_end || m.last_day;
+    $("range").textContent = a && b ? (a === b ? a : `${a} → ${b}`) : "";
+    let s = m.last_event ? `last event ${ago(m.last_event)}` : "nothing recorded yet";
+    if (since) s += ` · transcripts on this NAS start ${since}`;
     if (STATIC) { /* status already set */ } else if (w) {
-      s += w.ok ? ` · last ingest ${ago(w.last_run)} (${w.seconds}s)` : ` · last ingest failed: ${w.error}`;
       rec.className = "rec " + (w.ok && Date.now() - Date.parse(w.last_run) < 3 * (w.interval_min || 10) * 60000 ? "live" : "stale");
     } else rec.className = "rec";
     if (!STATIC) $("status").textContent = s;
     const k = [
-      [tok(m.context_tokens), "context tokens processed"],
+      [tok(m.context_tokens), "total tokens", m.cache_hit_rate != null ? [pct(m.cache_hit_rate, 0), "cache hit rate"] : null],
       [tok(m.output_tokens), "output tokens"],
       [int(m.requests), "model requests"],
       [bytes(m.tool_bytes), m.image_bytes ? `tool result bytes (${pct(m.image_bytes / (m.tool_bytes || 1), 0)} images)` : "tool result bytes"],
-      [int(m.sessions), `sessions (${int(m.subagent_sessions)} subagent)`],
-      [m.cost_usd ? "$" + Math.round(m.cost_usd).toLocaleString("en-US") : "n/a", "reported cost, where recorded"],
-      [m.list_cost_usd ? "$" + Math.round(m.list_cost_usd).toLocaleString("en-US") : "n/a", `list-price cost (${int(m.list_unpriced)} requests unpriced)`],
+      [int(m.sessions), "sessions", [int(m.subagent_sessions), m.subagent_sessions === 1 ? "subagent" : "subagents"]],
+      [m.cost_usd ? "$" + Math.round(m.cost_usd).toLocaleString("en-US") : "n/a", "API cost (where reported)"],
+      [m.list_cost_usd ? "$" + Math.round(m.list_cost_usd).toLocaleString("en-US") : "n/a", `API list price (${int(m.list_unpriced)} requests unpriced)`],
     ];
     if (m.prices_as_of) $("prices").textContent = `${m.prices_as_of}. Reported cost $${(+m.cost_usd || 0).toFixed(2)} (harness, where recorded); list-price cost $${(+m.list_cost_usd || 0).toFixed(2)}.`;
-    $("kpis").innerHTML = k.map(([v, l]) => `<div class="kpi"><div class="v">${esc(v)}</div><div class="k">${esc(l)}</div></div>`).join("");
+    $("kpis").innerHTML = k.map(([v, l, x]) => `<div class="kpi"><div class="v">${esc(v)}</div><div class="k">${esc(l)}</div>` +
+      (x ? `<div class="x"><b>${esc(x[0])}</b> ${esc(x[1])}</div>` : "") + `</div>`).join("");
   }
 
   const PANELS = ["context", "cache", "tools", "largest", "repeats", "sessions", "models", "loops", "subagents", "skills", "bash", "readtypes", "compactions", "beforeafter"];

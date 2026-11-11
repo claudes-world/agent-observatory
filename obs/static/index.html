@@ -17,7 +17,7 @@
     <span class="rec" id="rec" title="recorder status"></span>
     <div>
       <h1>Agent Observatory</h1>
-      <p class="sub">Black-box recorder for your coding agents. Private, on this NAS, read-only.</p>
+      <p class="sub">Private black-box recorder for your coding agents.</p>
     </div>
   </div>
   <div class="controls">
@@ -25,6 +25,7 @@
       <button data-days="7">7 days</button><button data-days="14">14 days</button><button data-days="30">30 days</button>
     </div>
     <div class="chips" id="chips" role="group" aria-label="Harness filter"></div>
+    <p class="range" id="range"></p>
     <p class="status" id="status">Reading the recorder&hellip;</p>
   </div>
 </header>
@@ -41,8 +42,9 @@
   </article>
 
   <article class="panel narrow" id="p-cache">
-    <header><span class="ch">02</span><h2>Context per request</h2><span class="unit">tokens, median and p95 per day</span></header>
-    <div class="figure" id="f-cache"></div>
+    <header><span class="ch">02</span><h2>Context size per model request</h2><span class="unit">tokens sent with each request</span></header>
+    <div class="figure duo" id="f-cache"></div>
+    <div class="readout" id="r-cache"></div>
     <div class="chart" id="c-cache"></div>
     <p class="hint" id="h-cache"></p>
   </article>
