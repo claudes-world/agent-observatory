@@ -3,7 +3,7 @@
 For each pointer the line must exist, parse as JSON, and contain the item it points at:
 - largest_tool_outputs / repeated_payloads: a tool result in that line whose content hashes to payload_hash
 - retry_loops: a tool call in that line whose input hashes to input_hash
-- per_session: the session id (or the subagent file stem) on that line
+- per_session: the session id (or the subagent file stem) on that line, or (Kimi, Antigravity) in the folder path
 Transcripts are opened read-only; roots come from <data>/sources.json.
 """
 import json, os, random
@@ -40,6 +40,11 @@ def hashes(o):
             res.add(sha(content_str(r.get("output") if isinstance(r, dict) else r)))
         if ev.get("type") == "tool.call":
             inp.add(sha(content_str(ev.get("args"))))
+    if o.get("type") == "GENERIC":  # Antigravity tool output
+        res.add(sha(content_str(o.get("content") or "")))
+    if o.get("type") == "PLANNER_RESPONSE":  # Antigravity tool calls
+        for c in o.get("tool_calls") or []:
+            inp.add(sha(content_str(c.get("args") or {})))
     p = o.get("payload") or {}
     if p.get("type") in ("function_call_output", "custom_tool_call_output"):
         res.add(sha(content_str(p.get("output"))))
@@ -78,8 +83,11 @@ def run(d, data, reports, n=5, seed=None, allow_missing=False):
                 o = json.loads(line)
                 res, inp, sids = hashes(o)
                 stem = os.path.basename(rel)[:-6]
+                # Kimi and Antigravity keep the session id in the folder path (session_<id>/, <id>/), not on the line
+                base = str(want).split(":")[0]
+                parts = rel.split("/")
                 good = (want in res) if kind == "result" else (want in inp) if kind == "input" else \
-                       (want in sids or want == stem or stem.endswith(str(want)))
+                       (want in sids or want == stem or stem.endswith(str(want)) or base in parts or "session_" + base in parts)
                 status = "ok" if good else "hash mismatch"
             except ValueError:
                 status = "line is not JSON"

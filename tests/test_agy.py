@@ -63,3 +63,17 @@ def test_agy_in_harness_filter(tmp_path):
     m = c.get("/api/meta?days=7").json()["rows"][0]
     assert {x["harness"] for x in m["harnesses"]} == {"antigravity"}
     assert c.get("/api/meta?days=7&harness=antigravity").json()["rows"][0]["requests"] == 3
+
+
+def test_agy_pointers_verify(tmp_path):
+    from obs import report, verify
+    root, out, rep = str(tmp_path / "brain"), str(tmp_path / "data"), str(tmp_path / "reports")
+    t0 = datetime.now(timezone.utc).replace(hour=0, minute=10, second=0, microsecond=0)
+    agy_brain(root, t0)
+    ingest.run_agy("2d", out, root)
+    d = t0.strftime("%Y-%m-%d")
+    assert report.run(d, out, rep) == 0
+    agg = json.load(open(os.path.join(rep, d + ".json")))
+    kinds = {s for s in ("largest_tool_outputs", "per_session") for r in agg.get(s) or [] if r.get("pointer")}
+    assert kinds == {"largest_tool_outputs", "per_session"}, kinds
+    assert verify.run(d, out, rep, n=50) == 0
