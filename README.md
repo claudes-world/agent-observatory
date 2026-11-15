@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/logo.png" alt="Agent Observatory" width="160"></p>
+<p align="center"><img src="docs/banner.jpg" alt="Agent Observatory" width="100%"></p>
 
 # Agent Observatory
 
