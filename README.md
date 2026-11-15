@@ -13,6 +13,8 @@ read-only dashboard serves the same numbers on your LAN, and the `agent-observat
 
 ![Dashboard](docs/dashboard.jpg)
 
+*Dashboard on synthetic data (`obs synth --days 30 --seed 7`).*
+
 ## Quick start
 
 ```sh
