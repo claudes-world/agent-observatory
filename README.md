@@ -87,11 +87,12 @@ Every step uses only the real result of the step before; numbers are quoted, nev
 | Claude Code profiles (another config home, for example DeepSeek, GLM or Qwen models through Claude Code) | `~/.claude-<name>/projects` | `claude-code:<name>` |
 | Codex | `~/.codex/sessions` | `codex` |
 | Kimi Code | `~/.kimi-code/sessions` | `kimi-code` |
+| Antigravity (`agy`, Gemini models) | `~/.gemini/antigravity-cli/brain/<conversation>/.system_generated/logs/transcript_full.jsonl` | `antigravity` |
 
 The container ingests `claude/` and `codex/`. On a host with Python 3.9+, `pip install .` gives the `obs` command:
 `obs ingest all --out data/` reads all of the default folders above, including every `~/.claude-*/projects`;
 `obs ingest claude --root ~/.claude/projects --root deepseek=~/.claude-deepseek/projects` names profile roots
-explicitly; `obs ingest kimi`, `obs report --date YYYY-MM-DD`, `obs summary --since 30d` and `obs serve` work on
+explicitly; `obs ingest kimi`, `obs ingest agy`, `obs report --date YYYY-MM-DD`, `obs summary --since 30d` and `obs serve` work on
 the same `data/` folder.
 
 ## Privacy model
@@ -124,7 +125,7 @@ the same `data/` folder.
 
 ```sh
 pip install '.[test]'
-pytest -q
+pytest -q        # or bin/test: one PASS/FAIL line, full log in build/test.log
 ```
 
 ## Licence

@@ -127,7 +127,7 @@ class View:
             con.execute(f"create temp view raw0 as {src}")
             # files ingested before the harness column existed: derive it from the src_file prefix
             old = ("case split_part(src_file, '/', 1) when 'claude' then 'claude-code' when 'codex' then 'codex' "
-                   "when 'kimi' then 'kimi-code' else 'claude-code:' || substr(split_part(src_file, '/', 1), 8) end")
+                   "when 'kimi' then 'kimi-code' when 'agy' then 'antigravity' else 'claude-code:' || substr(split_part(src_file, '/', 1), 8) end")
             cols0 = [r[0] for r in con.execute("describe raw0").fetchall()]
             have = "harness" in cols0
             hx = f"coalesce(harness, {old})" if have else old

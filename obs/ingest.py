@@ -439,13 +439,13 @@ def ms_between(a, b):
 
 
 def harness_of_key(key):
-    """claude -> claude-code; claude-<profile> -> claude-code:<profile>; codex; kimi -> kimi-code.
+    """claude -> claude-code; claude-<profile> -> claude-code:<profile>; codex; kimi -> kimi-code; agy -> antigravity.
     claude-restored-* (restored copies of the main ~/.claude/projects) stay plain claude-code."""
     if key == "claude" or key.startswith("claude-restored"):
         return "claude-code"
     if key.startswith("claude-"):
         return "claude-code:" + key[len("claude-"):]
-    return {"kimi": "kimi-code"}.get(key, key)
+    return {"kimi": "kimi-code", "agy": "antigravity"}.get(key, key)
 
 
 def event_key(row):
@@ -1030,6 +1030,8 @@ def run_all(since, out, claude_root=None, codex_root=None, align_day=False):
         run_lineage(out)
         if os.path.isdir(os.path.expanduser("~/.kimi-code/sessions")):
             run_kimi(since, out, None, align_day)
+        if os.path.isdir(os.path.expanduser("~/.gemini/antigravity-cli/brain")):
+            run_agy(since, out, None, align_day)
     return rc
 
 
@@ -1194,6 +1196,135 @@ def run_kimi(since, out, root=None, align_day=False):
     stats.update(models=sorted(m for m in stats["models"] if m), ingest_s=round(time.time() - t0, 1), days=sorted(sink.counts), coverage=coverage_of("kimi", files, sink))
     os.makedirs(out, exist_ok=True)
     with open(os.path.join(out, "ingest_stats_kimi.json"), "w") as f:
+        json.dump(stats, f)
+    print(json.dumps(stats))
+    return 0
+
+
+# ---------------------------------------------------------------- Antigravity (agy, Gemini) brain transcripts
+# <root>/<conversation-uuid>/.system_generated/logs/transcript_full.jsonl, one JSON step per line:
+# PLANNER_RESPONSE = one model request (input_tokens = uncached input, cache_read_tokens, output_tokens, model, tool_calls);
+# GENERIC = one tool output, in the same order as the calls of the preceding PLANNER_RESPONSE;
+# CHECKPOINT = context summarised (compaction; its tokens are the summariser's own call, not a planner request).
+ROOT_HINT_AGY = [None]
+AGY_SHELL = ("run_command",)
+AGY_FILE = ("read_file", "view_file", "write_to_file", "replace_file_content")
+
+
+def process_agy_file(path, cutoff, sink, stats):
+    root = ROOT_HINT_AGY[0]
+    relp = os.path.relpath(path, root) if root else os.path.basename(path)
+    src = "agy/" + relp.replace(os.sep, "/")
+    sid = relp.split(os.sep)[0] if root else os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(path))))
+    o2 = {"sessionId": sid}
+    model = None
+    pending = []  # (tool_call_id, name, input sha, call ts, cmd/file fields) waiting for their GENERIC output
+    reqs, results, marks = [], [], []
+    for ln, line in iter_lines(path):
+        stats["lines"] += 1
+        try:
+            o = json.loads(line)
+            t = o.get("type")
+            if t not in ("PLANNER_RESPONSE", "GENERIC", "CHECKPOINT") or not o.get("created_at"):
+                continue
+            ts = parse_ts(o["created_at"])
+
+            def mk(**kw):
+                e = base(sink.host, ts, o2, None, "agy")
+                e.update(provider="google", model=model, src_file=src, src_line=ln)
+                e.update(kw)
+                return e
+            if t == "CHECKPOINT":
+                pre = int(o.get("input_tokens") or 0) + int(o.get("cache_read_tokens") or 0)
+                marks.append((ts, "auto", pre or None, ln))
+                continue
+            if t == "PLANNER_RESPONSE":
+                model = o.get("model") or model
+                reqs.append(mk(event_type="llm_request", msg_id=str(o.get("step_index")),
+                               input_tokens=int(o.get("input_tokens") or 0), output_tokens=int(o.get("output_tokens") or 0),
+                               cache_read_tokens=int(o.get("cache_read_tokens") or 0), cache_write_tokens=0))
+                pending = []
+                for i, c in enumerate(o.get("tool_calls") or []):
+                    name, args = c.get("name"), c.get("args") or {}
+                    cid = f"{o.get('step_index')}:{i}"
+                    rs = content_str(args)
+                    ih = sha(rs)
+                    kw = {}
+                    if name in AGY_SHELL and isinstance(args, dict):
+                        cmd = str(args.get("CommandLine") or "")
+                        kw.update(shell_fields(cmd))
+                        kw.update(file_fields(shell_file(cmd)))
+                    elif name in AGY_FILE and isinstance(args, dict):
+                        kw.update(file_fields(args.get("Path") or args.get("TargetFile") or args.get("AbsolutePath")))
+                    carry = {k: kw[k] for k in CMD_KEYS + FILE_KEYS if k in kw}
+                    pending.append((cid, name, ih, ts, carry))
+                    if ts >= cutoff:
+                        sink.add(mk(event_type="tool_call", tool_name=name, tool_call_id=cid, input_sha256=ih,
+                                    content_bytes=len(rs.encode("utf-8", "replace")), **kw))
+                        stats["events"] += 1
+                continue
+            # GENERIC: the next pending call's output
+            if not pending:
+                continue
+            cid, name, ih, cts, carry = pending.pop(0)
+            if ts < cutoff:
+                continue
+            raw = o.get("content") or ""
+            s = content_str(raw)
+            kw = dict(carry)
+            err = o.get("status") not in ("DONE", "RUNNING")
+            if name in AGY_SHELL:
+                ec = exit_code_of(s)
+                err = err or (ec is not None and ec != 0)
+                kw["exit_code"] = ec
+            results.append(mk(event_type="tool_result", tool_name=name, tool_call_id=cid, **sizes(raw, s),
+                              result_sha256=sha(s), is_error=err, input_sha256=ih,
+                              duration_ms=ms_between(cts, ts), **kw))
+        except Exception:
+            stats["skipped"] += 1
+    for r in reqs + results:
+        if not r.get("model"):
+            r["model"] = model
+    bounds, binfo = find_boundaries(reqs, marks)
+    tag_requests(reqs, bounds, sid)
+    compaction_rows(reqs, bounds, binfo, sid, sink, stats, cutoff)
+    add_tail(results, reqs, bounds, sink, stats, sid)
+    for r in reqs:
+        set_list_cost(r)
+        if r["ts"] >= cutoff:
+            sink.add(r)
+            stats["events"] += 1
+            stats["models"].add(r["model"])
+
+
+def run_agy(since, out, root=None, align_day=False):
+    t0 = time.time()
+    root = root or os.path.expanduser("~/.gemini/antigravity-cli/brain")
+    ROOT_HINT_AGY[0] = root
+    write_sources(out, agy=root)
+    cutoff = datetime.now(timezone.utc) - parse_since(since)
+    if align_day:
+        cutoff = cutoff.replace(hour=0, minute=0, second=0, microsecond=0)
+    files = []
+    for p in glob.glob(os.path.join(root, "*", ".system_generated", "logs", "transcript_full.jsonl")):
+        try:
+            if os.path.getmtime(p) >= cutoff.timestamp():
+                files.append(p)
+        except OSError:
+            pass
+    stats = {"files": 0, "lines": 0, "skipped": 0, "events": 0, "models": set()}
+    sink = Sink(out, "-agy", harness_of_key("agy"))
+    for p in sorted(files):
+        try:
+            process_agy_file(p, cutoff, sink, stats)
+        except OSError as e:
+            print("skip file", p, e, file=sys.stderr)
+            continue
+        stats["files"] += 1
+    sink.close()
+    stats.update(models=sorted(m for m in stats["models"] if m), ingest_s=round(time.time() - t0, 1), days=sorted(sink.counts), coverage=coverage_of("agy", files, sink))
+    os.makedirs(out, exist_ok=True)
+    with open(os.path.join(out, "ingest_stats_agy.json"), "w") as f:
         json.dump(stats, f)
     print(json.dumps(stats))
     return 0

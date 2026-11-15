@@ -7,7 +7,7 @@ def main(argv=None):
     p = argparse.ArgumentParser(prog="obs")
     sub = p.add_subparsers(dest="cmd", required=True)
     i = sub.add_parser("ingest")
-    i.add_argument("source", choices=["claude", "codex", "kimi", "all", "lineage"])
+    i.add_argument("source", choices=["claude", "codex", "kimi", "agy", "all", "lineage"])
     i.add_argument("--since", default="30d", help="window, aligned to UTC midnight (default 30d)")
     i.add_argument("--out", default="data/")
     i.add_argument("--path", default=None, help="lineage: spawn hook log (default $OBS_LINEAGE or ~/.local/state/agent-observatory/lineage.jsonl)")
@@ -109,6 +109,8 @@ def main(argv=None):
             return ingest.run_codex(a.since, a.out, root1, align_day=True)
         if a.source == "kimi":
             return ingest.run_kimi(a.since, a.out, root1, align_day=True)
+        if a.source == "agy":
+            return ingest.run_agy(a.since, a.out, root1, align_day=True)
         if a.source == "all":
             if a.root:  # synth layout: <root>/claude and <root>/codex/sessions
                 return ingest.run_all(a.since, a.out, os.path.join(root1, "claude"), os.path.join(root1, "codex", "sessions"), align_day=True)
