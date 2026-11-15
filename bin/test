@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Run the test suite; print one line: PASS/FAIL with pytest's counts. Full output only on failure (failing lines).
+set -u
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+PY="${OBS_PY:-.venv/bin/python}"; [ -x "$PY" ] || PY=python3  # OBS_PY overrides the interpreter
+mkdir -p build; LOG=build/test.log  # overwritten each run (build/ is gitignored)
+"$PY" -m pytest -q -p no:cacheprovider tests "$@" > "$LOG" 2>&1
+RC=$?
+SUM="$(grep -E '[0-9]+ (passed|failed|error)' "$LOG" | tail -1 | tr -d '=' | sed 's/^ *//;s/ *$//')"
+if [ "$RC" -eq 0 ]; then
+  echo "PASS ${SUM:-no summary}"
+else
+  echo "FAIL rc=$RC ${SUM:-no summary} (log $LOG)"
+  grep -E '^(FAILED|ERROR) ' "$LOG" | head -20
+fi
+exit "$RC"
